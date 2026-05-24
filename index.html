@@ -2,43 +2,126 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<meta name="theme-color" content="#b30000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>World Crime Rates Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""/>
 <style>
-  html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  #map { height: 100vh; width: 100%; background: #aad3df; }
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+  html, body {
+    height: 100%; margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+  }
+  #map {
+    position: absolute; inset: 0;
+    background: #aad3df;
+  }
 
   .panel {
     position: absolute;
     z-index: 1000;
-    background: rgba(255,255,255,0.95);
+    background: rgba(255,255,255,0.96);
     padding: 12px 14px;
-    border-radius: 6px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.25);
     font-size: 13px;
     line-height: 1.4;
+    -webkit-tap-highlight-color: transparent;
   }
-  #title { top: 12px; left: 60px; max-width: 320px; }
+  #title { top: calc(12px + var(--safe-top)); left: 60px; max-width: 320px; }
   #title h1 { margin: 0 0 4px; font-size: 16px; }
   #title p { margin: 0; color: #555; font-size: 12px; }
 
-  #info { top: 12px; right: 12px; min-width: 200px; }
+  #info { top: calc(12px + var(--safe-top)); right: calc(12px + var(--safe-right)); min-width: 200px; }
   #info h2 { margin: 0 0 4px; font-size: 14px; }
   #info .rate { font-size: 22px; font-weight: 600; color: #b30000; }
   #info .unit { color: #666; font-size: 11px; }
   #info .hint { color: #999; font-style: italic; }
 
-  #legend { bottom: 20px; left: 12px; }
+  #legend { bottom: calc(20px + var(--safe-bottom)); left: calc(12px + var(--safe-left)); }
   #legend .row { display: flex; align-items: center; margin: 2px 0; }
-  #legend .sw { width: 22px; height: 14px; margin-right: 8px; border: 1px solid #777; }
-  #legend h3 { margin: 0 0 6px; font-size: 13px; }
+  #legend .sw { width: 22px; height: 14px; margin-right: 8px; border: 1px solid #777; flex: none; }
+  #legend h3 { margin: 0 0 6px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  #legend.collapsed .row { display: none; }
+  #legend .toggle { font-size: 11px; color: #888; margin-left: 8px; user-select: none; }
 
-  #search { top: 12px; left: 360px; }
-  #search input { padding: 6px 8px; border: 1px solid #bbb; border-radius: 4px; width: 200px; font-size: 13px; }
+  #search { top: calc(12px + var(--safe-top)); left: 360px; }
+  #search input {
+    padding: 8px 10px; border: 1px solid #bbb; border-radius: 6px;
+    width: 200px; font-size: 14px; -webkit-appearance: none;
+  }
 
   .country-tooltip { font-weight: 600; }
+
+  /* Mobile / small screens: stack panels into a top bar + bottom sheet. */
+  @media (max-width: 760px) {
+    .panel { font-size: 14px; }
+    #title {
+      top: calc(8px + var(--safe-top));
+      left: calc(56px + var(--safe-left));
+      right: calc(8px + var(--safe-right));
+      max-width: none;
+      padding: 8px 10px;
+    }
+    #title h1 { font-size: 14px; margin: 0; }
+    #title p { display: none; }
+
+    #search {
+      top: auto;
+      bottom: calc(12px + var(--safe-bottom));
+      right: calc(12px + var(--safe-right));
+      left: auto;
+      padding: 6px 8px;
+    }
+    #search input { width: 150px; font-size: 16px; /* avoid iOS zoom-on-focus */ }
+
+    /* Bottom sheet for the selected country. */
+    #info {
+      top: auto;
+      bottom: calc(12px + var(--safe-bottom));
+      left: calc(12px + var(--safe-left));
+      right: calc(12px + var(--safe-right));
+      min-width: 0;
+      padding: 10px 14px;
+    }
+    #info h2 { font-size: 13px; }
+    #info .rate { font-size: 26px; }
+    #info .hint { display: none; }
+
+    /* Legend: position above bottom sheet, default collapsed on mobile. */
+    #legend {
+      bottom: auto;
+      top: calc(64px + var(--safe-top));
+      left: calc(8px + var(--safe-left));
+      padding: 6px 10px;
+      max-width: 150px;
+    }
+    #legend h3 { font-size: 12px; }
+    #legend .row { font-size: 11px; }
+  }
+
+  /* Very small / landscape phones: shrink further. */
+  @media (max-width: 420px) {
+    #title h1 { font-size: 13px; }
+    #info .rate { font-size: 22px; }
+    #search input { width: 120px; }
+  }
+
+  /* Bigger Leaflet zoom buttons for touch. */
+  .leaflet-touch .leaflet-bar a {
+    width: 36px; height: 36px; line-height: 36px; font-size: 20px;
+  }
 </style>
 </head>
 <body>
@@ -54,13 +137,13 @@
 </div>
 
 <div id="info" class="panel">
-  <h2 id="infoName">Hover a country</h2>
+  <h2 id="infoName">Tap a country</h2>
   <div><span id="infoRate" class="rate">&mdash;</span> <span class="unit">per 100k</span></div>
-  <div id="infoHint" class="hint">Click to zoom.</div>
+  <div id="infoHint" class="hint">Tap to select, double-tap to zoom.</div>
 </div>
 
 <div id="legend" class="panel">
-  <h3>Homicides / 100k</h3>
+  <h3 id="legendHeader">Homicides / 100k <span class="toggle" id="legendToggle">hide</span></h3>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -133,8 +216,19 @@ function getColor(rate) {
   return colors[colors.length - 1];
 }
 
-// Map setup
-const map = L.map('map', { worldCopyJump: true, minZoom: 2 }).setView([20, 0], 2);
+// Detect coarse-pointer (touch) devices.
+const isTouch = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+
+// Map setup. Tap tolerance + an appropriate initial zoom for narrow screens.
+const initialZoom = window.innerWidth < 500 ? 1 : 2;
+const map = L.map('map', {
+  worldCopyJump: true,
+  minZoom: 1,
+  tap: true,
+  tapTolerance: 20,
+  zoomControl: true
+}).setView([20, 0], initialZoom);
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors | Crime data: UNODC',
   maxZoom: 8
@@ -144,21 +238,27 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 const infoName = document.getElementById('infoName');
 const infoRate = document.getElementById('infoRate');
 const infoHint = document.getElementById('infoHint');
+const defaultPrompt = isTouch ? 'Tap a country' : 'Hover a country';
+const defaultHint = isTouch ? 'Tap to select, double-tap to zoom.' : 'Click to zoom.';
+infoName.textContent = defaultPrompt;
+infoHint.textContent = defaultHint;
 
 function showInfo(name, rate) {
-  infoName.textContent = name || 'Hover a country';
+  infoName.textContent = name || defaultPrompt;
   if (rate === undefined || rate === null) {
-    infoRate.textContent = 'No data';
+    infoRate.textContent = name ? 'No data' : '—';
     infoRate.style.color = '#999';
   } else {
     infoRate.textContent = rate.toFixed(2);
     infoRate.style.color = '#b30000';
   }
-  infoHint.textContent = name ? 'Click to zoom.' : '';
+  infoHint.textContent = name ? (isTouch ? 'Double-tap to zoom.' : 'Click to zoom.') : defaultHint;
 }
 
 // Build legend
 const legend = document.getElementById('legend');
+const legendToggle = document.getElementById('legendToggle');
+const legendHeader = document.getElementById('legendHeader');
 const legendRows = [
   ['No data', '#d9d9d9'],
   ['0 – 0.5', colors[0]],
@@ -176,6 +276,22 @@ for (const [label, color] of legendRows) {
   row.innerHTML = `<span class="sw" style="background:${color}"></span>${label}`;
   legend.appendChild(row);
 }
+
+// Collapse legend by default on small screens.
+function setLegendCollapsed(collapsed) {
+  legend.classList.toggle('collapsed', collapsed);
+  legendToggle.textContent = collapsed ? 'show' : 'hide';
+}
+setLegendCollapsed(window.innerWidth <= 760);
+legendHeader.addEventListener('click', () => {
+  setLegendCollapsed(!legend.classList.contains('collapsed'));
+});
+// Stop the map from receiving taps on panels.
+['info', 'title', 'legend', 'search'].forEach(id => {
+  const el = document.getElementById(id);
+  L.DomEvent.disableClickPropagation(el);
+  L.DomEvent.disableScrollPropagation(el);
+});
 
 // Load country boundaries (GeoJSON with ISO_A3 codes)
 const GEO_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
@@ -200,6 +316,14 @@ function resetHighlight(layer) {
   countryLayer.resetStyle(layer);
 }
 
+let selectedLayer = null;
+function selectLayer(layer, name, rate) {
+  if (selectedLayer && selectedLayer !== layer) resetHighlight(selectedLayer);
+  selectedLayer = layer;
+  highlight(layer);
+  showInfo(name, rate);
+}
+
 fetch(GEO_URL)
   .then(r => r.json())
   .then(data => {
@@ -209,13 +333,28 @@ fetch(GEO_URL)
         const name = feature.properties.ADMIN || feature.properties.name;
         const rate = homicideRates[feature.properties.ISO_A3];
         layersByName[name.toLowerCase()] = layer;
-        layer.bindTooltip(name, { sticky: true, className: 'country-tooltip' });
-        layer.on('mouseover', () => { highlight(layer); showInfo(name, rate); });
-        layer.on('mouseout', () => { resetHighlight(layer); });
-        layer.on('click', () => {
-          map.fitBounds(layer.getBounds(), { maxZoom: 5 });
-          showInfo(name, rate);
-        });
+        // Tooltips only on devices with real hover — they're noisy on touch.
+        if (!isTouch) {
+          layer.bindTooltip(name, { sticky: true, className: 'country-tooltip' });
+          layer.on('mouseover', () => { highlight(layer); showInfo(name, rate); });
+          layer.on('mouseout', () => {
+            if (layer !== selectedLayer) resetHighlight(layer);
+            if (!selectedLayer) showInfo(null);
+          });
+          layer.on('click', () => {
+            map.fitBounds(layer.getBounds(), { maxZoom: 5 });
+            selectLayer(layer, name, rate);
+          });
+        } else {
+          // On touch: first tap selects + shows info; second tap on same country zooms.
+          layer.on('click', () => {
+            if (selectedLayer === layer) {
+              map.fitBounds(layer.getBounds(), { maxZoom: 5, padding: [20, 20] });
+            } else {
+              selectLayer(layer, name, rate);
+            }
+          });
+        }
       }
     }).addTo(map);
   })
@@ -224,19 +363,43 @@ fetch(GEO_URL)
     infoHint.textContent = err.message;
   });
 
+// On touch, tapping empty map clears selection.
+if (isTouch) {
+  map.on('click', e => {
+    if (e.originalEvent && e.originalEvent._stopped) return;
+    if (selectedLayer) {
+      resetHighlight(selectedLayer);
+      selectedLayer = null;
+      showInfo(null);
+    }
+  });
+}
+
+// Keep the map sized correctly after orientation changes / mobile URL bar shifts.
+window.addEventListener('resize', () => map.invalidateSize());
+window.addEventListener('orientationchange', () => setTimeout(() => map.invalidateSize(), 200));
+
 // Search
 const searchBox = document.getElementById('searchBox');
-searchBox.addEventListener('keydown', e => {
-  if (e.key !== 'Enter') return;
+function runSearch() {
   const q = searchBox.value.trim().toLowerCase();
   if (!q) return;
   const exact = layersByName[q];
   const match = exact || Object.entries(layersByName).find(([n]) => n.includes(q))?.[1];
   if (match) {
-    map.fitBounds(match.getBounds(), { maxZoom: 5 });
-    match.fire('mouseover');
+    map.fitBounds(match.getBounds(), { maxZoom: 5, padding: [20, 20] });
+    const f = match.feature;
+    const name = f.properties.ADMIN || f.properties.name;
+    const rate = homicideRates[f.properties.ISO_A3];
+    selectLayer(match, name, rate);
   }
+  searchBox.blur();
+}
+searchBox.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
 });
+// Submit on iOS "Go" key via implicit form-less submit (no form element here).
+searchBox.addEventListener('change', runSearch);
 </script>
 </body>
 </html>
