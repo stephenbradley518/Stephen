@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>World Crime Rates Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""/>
+<style>
+  html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #map { height: 100vh; width: 100%; background: #aad3df; }
+
+  .panel {
+    position: absolute;
+    z-index: 1000;
+    background: rgba(255,255,255,0.95);
+    padding: 12px 14px;
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  #title { top: 12px; left: 60px; max-width: 320px; }
+  #title h1 { margin: 0 0 4px; font-size: 16px; }
+  #title p { margin: 0; color: #555; font-size: 12px; }
+
+  #info { top: 12px; right: 12px; min-width: 200px; }
+  #info h2 { margin: 0 0 4px; font-size: 14px; }
+  #info .rate { font-size: 22px; font-weight: 600; color: #b30000; }
+  #info .unit { color: #666; font-size: 11px; }
+  #info .hint { color: #999; font-style: italic; }
+
+  #legend { bottom: 20px; left: 12px; }
+  #legend .row { display: flex; align-items: center; margin: 2px 0; }
+  #legend .sw { width: 22px; height: 14px; margin-right: 8px; border: 1px solid #777; }
+  #legend h3 { margin: 0 0 6px; font-size: 13px; }
+
+  #search { top: 12px; left: 360px; }
+  #search input { padding: 6px 8px; border: 1px solid #bbb; border-radius: 4px; width: 200px; font-size: 13px; }
+
+  .country-tooltip { font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="title" class="panel">
+  <h1>World Crime Rates</h1>
+  <p>Intentional homicide rate per 100,000 people (most recent year available, UNODC).</p>
+</div>
+
+<div id="search" class="panel">
+  <input id="searchBox" type="text" placeholder="Search country..." autocomplete="off"/>
+</div>
+
+<div id="info" class="panel">
+  <h2 id="infoName">Hover a country</h2>
+  <div><span id="infoRate" class="rate">&mdash;</span> <span class="unit">per 100k</span></div>
+  <div id="infoHint" class="hint">Click to zoom.</div>
+</div>
+
+<div id="legend" class="panel">
+  <h3>Homicides / 100k</h3>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+<script>
+// Intentional homicide rate per 100,000 population.
+// Source: UNODC (United Nations Office on Drugs and Crime) — most recent year
+// available (2019–2022 depending on country). A few well-known data-poor
+// states use widely cited published estimates.
+const homicideRates = {
+  AFG: 6.66, ALB: 2.29, DZA: 1.36, AND: 1.30, AGO: 4.85,
+  ATG: 6.71, ARG: 4.62, ARM: 1.84, AUS: 0.86, AUT: 0.99,
+  AZE: 1.97, BHS: 31.20, BHR: 0.46, BGD: 2.41, BRB: 11.91,
+  BLR: 2.43, BEL: 1.74, BLZ: 29.05, BEN: 6.05, BTN: 2.42,
+  BOL: 3.71, BIH: 1.36, BWA: 14.05, BRA: 21.32, BRN: 0.30,
+  BGR: 1.34, BFA: 0.79, BDI: 4.21, KHM: 2.13, CMR: 4.06,
+  CAN: 2.06, CPV: 5.31, CAF: 17.59, TCD: 6.21, CHL: 4.50,
+  CHN: 0.53, COL: 26.13, COM: 7.50, COG: 9.94, COD: 13.41,
+  CRI: 11.49, CIV: 5.83, HRV: 0.95, CUB: 4.97, CYP: 0.79,
+  CZE: 0.69, DNK: 1.01, DJI: 6.45, DMA: 21.07, DOM: 12.51,
+  ECU: 25.62, EGY: 1.36, SLV: 7.81, GNQ: 2.79, ERI: 4.85,
+  EST: 1.95, SWZ: 36.74, ETH: 7.55, FJI: 2.42, FIN: 1.32,
+  FRA: 1.35, GAB: 5.51, GMB: 1.86, GEO: 2.05, DEU: 0.83,
+  GHA: 2.10, GRC: 0.88, GRD: 7.10, GTM: 17.33, GIN: 2.84,
+  GNB: 6.06, GUY: 16.17, HTI: 18.00, HND: 35.80, HUN: 0.91,
+  ISL: 0.30, IND: 3.00, IDN: 0.43, IRN: 2.48, IRQ: 7.50,
+  IRL: 0.63, ISR: 1.79, ITA: 0.51, JAM: 53.34, JPN: 0.23,
+  JOR: 1.20, KAZ: 4.04, KEN: 4.92, KIR: 7.51, PRK: 4.42,
+  KOR: 0.60, KWT: 1.13, KGZ: 4.40, LAO: 5.61, LVA: 4.21,
+  LBN: 4.04, LSO: 43.56, LBR: 3.20, LBY: 2.30, LIE: 2.62,
+  LTU: 3.51, LUX: 1.42, MKD: 1.59, MDG: 0.74, MWI: 1.65,
+  MYS: 2.13, MDV: 0.73, MLI: 5.07, MLT: 0.91, MRT: 9.97,
+  MUS: 1.42, MEX: 25.20, MDA: 3.14, MCO: 0.00, MNG: 6.05,
+  MNE: 2.69, MAR: 1.50, MOZ: 4.30, MMR: 2.40, NAM: 9.42,
+  NPL: 2.18, NLD: 0.66, NZL: 1.32, NIC: 5.51, NER: 4.97,
+  NGA: 21.73, NOR: 0.55, OMN: 0.41, PAK: 4.13, PSE: 1.10,
+  PAN: 11.51, PNG: 7.39, PRY: 6.21, PER: 7.71, PHL: 4.31,
+  POL: 0.71, PRT: 0.87, QAT: 0.13, ROU: 1.10, RUS: 7.30,
+  RWA: 2.65, KNA: 31.55, LCA: 23.73, VCT: 36.49, WSM: 2.16,
+  SMR: 0.00, STP: 1.84, SAU: 0.62, SEN: 3.43, SRB: 1.16,
+  SYC: 1.30, SLE: 1.85, SGP: 0.16, SVK: 1.13, SVN: 0.49,
+  SLB: 4.45, SOM: 5.62, ZAF: 41.91, SSD: 8.94, ESP: 0.69,
+  LKA: 2.10, SDN: 5.61, SUR: 4.69, SWE: 1.10, CHE: 0.55,
+  SYR: 2.20, TJK: 1.36, TZA: 7.99, THA: 2.62, TLS: 4.07,
+  TGO: 6.40, TON: 2.10, TTO: 39.53, TUN: 2.17, TUR: 2.59,
+  TKM: 4.20, UGA: 9.43, UKR: 4.13, ARE: 0.49, GBR: 1.15,
+  USA: 6.38, URY: 11.20, UZB: 1.05, VUT: 0.49, VEN: 40.40,
+  VNM: 1.53, YEM: 5.00, ZMB: 5.05, ZWE: 5.27,
+  // Disputed / less standardized codes that often appear in GeoJSON:
+  XKX: 1.79, // Kosovo
+  SOL: 5.62, // Somaliland (uses Somalia figure as fallback)
+  ESH: 1.50, // Western Sahara (uses Morocco as fallback)
+  FLK: 0.00, // Falkland Islands
+  GRL: 5.30, // Greenland
+  ATA: 0.00, // Antarctica
+  ATF: 0.00, // French Southern Territories
+  TWN: 0.78  // Taiwan
+};
+
+// Colour scale (sequential reds, with grey for "no data").
+const breaks = [0.5, 1, 2, 5, 10, 20, 30];
+const colors = ['#fff5f0', '#fee0d2', '#fcbba1', '#fc9272', '#fb6a4a', '#ef3b2c', '#cb181d', '#67000d'];
+
+function getColor(rate) {
+  if (rate === undefined || rate === null) return '#d9d9d9';
+  for (let i = 0; i < breaks.length; i++) {
+    if (rate <= breaks[i]) return colors[i];
+  }
+  return colors[colors.length - 1];
+}
+
+// Map setup
+const map = L.map('map', { worldCopyJump: true, minZoom: 2 }).setView([20, 0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors | Crime data: UNODC',
+  maxZoom: 8
+}).addTo(map);
+
+// Info panel
+const infoName = document.getElementById('infoName');
+const infoRate = document.getElementById('infoRate');
+const infoHint = document.getElementById('infoHint');
+
+function showInfo(name, rate) {
+  infoName.textContent = name || 'Hover a country';
+  if (rate === undefined || rate === null) {
+    infoRate.textContent = 'No data';
+    infoRate.style.color = '#999';
+  } else {
+    infoRate.textContent = rate.toFixed(2);
+    infoRate.style.color = '#b30000';
+  }
+  infoHint.textContent = name ? 'Click to zoom.' : '';
+}
+
+// Build legend
+const legend = document.getElementById('legend');
+const legendRows = [
+  ['No data', '#d9d9d9'],
+  ['0 – 0.5', colors[0]],
+  ['0.5 – 1', colors[1]],
+  ['1 – 2', colors[2]],
+  ['2 – 5', colors[3]],
+  ['5 – 10', colors[4]],
+  ['10 – 20', colors[5]],
+  ['20 – 30', colors[6]],
+  ['30+', colors[7]],
+];
+for (const [label, color] of legendRows) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `<span class="sw" style="background:${color}"></span>${label}`;
+  legend.appendChild(row);
+}
+
+// Load country boundaries (GeoJSON with ISO_A3 codes)
+const GEO_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
+let countryLayer;
+const layersByName = {};
+
+function styleFor(feature) {
+  const rate = homicideRates[feature.properties.ISO_A3];
+  return {
+    fillColor: getColor(rate),
+    weight: 0.6,
+    color: '#555',
+    fillOpacity: 0.85
+  };
+}
+
+function highlight(layer) {
+  layer.setStyle({ weight: 2, color: '#222', fillOpacity: 0.95 });
+  layer.bringToFront();
+}
+function resetHighlight(layer) {
+  countryLayer.resetStyle(layer);
+}
+
+fetch(GEO_URL)
+  .then(r => r.json())
+  .then(data => {
+    countryLayer = L.geoJSON(data, {
+      style: styleFor,
+      onEachFeature: (feature, layer) => {
+        const name = feature.properties.ADMIN || feature.properties.name;
+        const rate = homicideRates[feature.properties.ISO_A3];
+        layersByName[name.toLowerCase()] = layer;
+        layer.bindTooltip(name, { sticky: true, className: 'country-tooltip' });
+        layer.on('mouseover', () => { highlight(layer); showInfo(name, rate); });
+        layer.on('mouseout', () => { resetHighlight(layer); });
+        layer.on('click', () => {
+          map.fitBounds(layer.getBounds(), { maxZoom: 5 });
+          showInfo(name, rate);
+        });
+      }
+    }).addTo(map);
+  })
+  .catch(err => {
+    infoName.textContent = 'Failed to load country shapes';
+    infoHint.textContent = err.message;
+  });
+
+// Search
+const searchBox = document.getElementById('searchBox');
+searchBox.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const q = searchBox.value.trim().toLowerCase();
+  if (!q) return;
+  const exact = layersByName[q];
+  const match = exact || Object.entries(layersByName).find(([n]) => n.includes(q))?.[1];
+  if (match) {
+    map.fitBounds(match.getBounds(), { maxZoom: 5 });
+    match.fire('mouseover');
+  }
+});
+</script>
+</body>
+</html>
