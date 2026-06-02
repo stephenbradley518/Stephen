@@ -1,0 +1,37 @@
+[
+  {
+    "Vendor Name": "  Acme Components  ",
+    "Unit Cost": "$1,200.00",
+    "Lead Time (days)": "10",
+    "Quality": "98%",
+    "Target Price": "$1,500"
+  },
+  {
+    "vendor": "Globex Industrial",
+    "price": "1800",
+    "leadtime": 22,
+    "quality_rating": 0.82,
+    "benchmark_price": "1,750"
+  },
+  {
+    "supplier": "Initech Parts",
+    "cost": "950.0",
+    "delivery_days": "12 ",
+    "acceptance_rate": "95",
+    "target": "1100"
+  },
+  {
+    "Supplier": "Umbrella Supplies",
+    "Spend": "$2,100",
+    "Lead": "35",
+    "QA Score": "70",
+    "Budget Price": "1900"
+  },
+  {
+    "vendor_name": "Broken Record Co",
+    "unit_cost": "n/a",
+    "lead_time_days": "",
+    "quality": "",
+    "target_cost": "1000"
+  }
+]
