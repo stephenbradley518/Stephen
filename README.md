@@ -118,3 +118,104 @@ the rest as structured `IngestionIssue`s rather than failing silently.
 * `SOA_LOG_LEVEL` — log verbosity (`DEBUG`, `INFO` default, `WARNING`, ...).
 * `ROIConfig` — pass a custom config to any scoring/workflow call (thresholds,
   penalty rates, value-score weights).
+
+---
+
+# Betfair + Keras sporting-event outcome predictor
+
+A second, independent module in this repo (`betting_predictor/`): connects
+to the Betfair Exchange API for live market prices and uses a Keras deep
+learning model to predict event outcomes and flag "value" selections where
+the model's probability beats the market's own de-vigged price.
+
+```
+betting_predictor/
+  config.py            env-driven config (Betfair creds, model paths)
+  betfair_client.py    Betfair API-NG JSON-RPC client (interactive + cert login)
+  features.py          market data -> normalized feature vectors
+  synthetic_data.py     synthetic market/outcome generator (no live account needed)
+  model.py              Keras model: build / train / save / load / predict
+  train.py               CLI to train on synthetic data and save the model
+  app.py                 Flask API
+run_betting_server.py    entry point (python run_betting_server.py)
+```
+
+### How the model works
+
+Each selection (e.g. home / draw / away) becomes a feature vector: best back
+price, best lay price, implied probability, overround-adjusted ("de-vigged")
+probability, matched volume, and 5-minute price drift. A feedforward Keras
+network (Dense → BatchNorm → Dropout, twice, softmax output) is trained with
+categorical cross-entropy to output calibrated outcome probabilities. Since
+there's no live Betfair account or historical data feed available in this
+environment, `synthetic_data.py` generates structured synthetic markets
+(latent true win probabilities distorted by realistic overround + noise) so
+the whole pipeline runs end-to-end — swap it for a real historical loader
+once you have Betfair credentials / historical data access.
+
+`train.py` reports the model's validation log loss against a market
+baseline (just using the de-vigged market price as the prediction), so you
+can see whether the network is actually adding edge over the market.
+
+### Quickstart
+
+```bash
+pip install -r requirements.txt
+
+# 1) Train the model (synthetic data — no Betfair account required)
+python -m betting_predictor.train --events 20000 --epochs 30
+
+# 2) Run the API
+python run_betting_server.py
+# -> http://127.0.0.1:5000
+
+# 3) Tests
+python -m pytest tests/test_betting_predictor.py -q
+```
+
+Set Betfair credentials (see `.env.example`) to use the live endpoints:
+
+```bash
+export BETFAIR_APP_KEY=...
+export BETFAIR_USERNAME=...
+export BETFAIR_PASSWORD=...
+```
+
+### API endpoints
+
+| Method | Path                              | Purpose                                            |
+| ------ | ---------------------------------- | --------------------------------------------------- |
+| GET    | `/health`                          | Liveness + config status check                       |
+| GET    | `/betfair/event-types`             | List Betfair sport event types (requires creds)      |
+| GET    | `/betfair/markets`                 | List markets (`event_type_id`, `market_type` query)  |
+| GET    | `/betfair/market/<id>/prices`      | Live prices for one market                           |
+| POST   | `/predict`                         | Predict outcome probabilities + value-bet flags      |
+| POST   | `/train`                           | Retrain on fresh synthetic data (demo/dev)            |
+
+`/predict` accepts either a live `market_id` (fetched from Betfair) or a raw
+`selections` list for manual testing:
+
+```bash
+curl -s localhost:5000/predict -H 'content-type: application/json' -d '{
+  "selections": [
+    {"back_price": 2.0, "lay_price": 2.02, "matched_volume": 15000},
+    {"back_price": 3.5, "lay_price": 3.6,  "matched_volume": 8000},
+    {"back_price": 4.2, "lay_price": 4.3,  "matched_volume": 5000}
+  ]
+}' | python -m json.tool
+```
+
+Each returned selection includes `market_implied_prob`, `model_prob`,
+`edge` (model minus market), and `value_bet` (true when the edge exceeds
+`VALUE_EDGE_THRESHOLD`, default 0.02).
+
+### Notes
+
+* Betfair credentials are read from environment variables only — never
+  hardcoded or logged. Certificate login is used automatically when
+  `BETFAIR_CERT_FILE`/`BETFAIR_CERT_KEY` are set (Betfair's recommended flow
+  for unattended clients); otherwise the client falls back to interactive
+  login.
+* This predicts probabilities for informational/research purposes — it is
+  not betting advice, and past synthetic/backtested performance is not
+  indicative of real-market results.
