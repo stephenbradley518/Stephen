@@ -10,3 +10,10 @@ langgraph>=0.0.40
 # Dev / test
 pytest>=8.0
 httpx>=0.27          # FastAPI TestClient dependency
+
+# --- Betfair + Keras outcome predictor (betting_predictor/) ---
+flask>=3.0
+requests>=2.31
+numpy>=1.26
+scikit-learn>=1.4
+tensorflow>=2.16     # provides tensorflow.keras

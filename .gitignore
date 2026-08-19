@@ -22,3 +22,11 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+
+# Trained model artifacts (regenerate with `python -m betting_predictor.train`)
+betting_predictor/models/*.keras
+betting_predictor/models/*.h5
+betting_predictor/models/*.pkl
+
+# Local secrets
+.env
